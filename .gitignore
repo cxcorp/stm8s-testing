@@ -1,0 +1,10 @@
+*.cdb
+*.elf
+*.lk
+*.map
+*.asm
+*.d
+*.lst
+*.rel
+*.rst
+*.sym
