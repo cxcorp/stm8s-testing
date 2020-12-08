@@ -22,7 +22,7 @@ SCRIPT     ?=
 
 DEFS       += STM8S103
 KEYS       += .sdcc .stm8 .stm8s *
-LIBS       += stm8 IntrOS
+LIBS       += stm8
 
 #----------------------------------------------------------#
 
@@ -34,8 +34,7 @@ COPY       := $(SDCC)sdobjcopy
 DBG        := $(SDCC)sdcdb
 SIM        := $(SDCC)sstm8
 
-SIZE       := size
-
+MKDIR	   := md
 RM         := del /F/Q
 
 #----------------------------------------------------------#
@@ -58,15 +57,16 @@ endif
 
 #----------------------------------------------------------#
 
-ELF        := $(PROJECT).elf
-HEX        := $(PROJECT).hex
-LIB        := $(PROJECT).lib
-MAP        := $(PROJECT).map
-CDB        := $(PROJECT).cdb
-LKF        := $(PROJECT).lk
+OBJ_DIR    := obj
+ELF        := $(OBJ_DIR)/$(PROJECT).elf
+HEX        := $(OBJ_DIR)/$(PROJECT).hex
+LIB        := $(OBJ_DIR)/$(PROJECT).lib
+MAP        := $(OBJ_DIR)/$(PROJECT).map
+CDB        := $(OBJ_DIR)/$(PROJECT).cdb
+LKF        := $(OBJ_DIR)/$(PROJECT).lk
 
-OBJS       := $(AS_SRCS:.s=.rel)
-OBJS       += $(CC_SRCS:.c=.rel)
+OBJS       := $(addprefix $(OBJ_DIR)/,$(AS_SRCS:.s=.rel))
+OBJS       += $(addprefix $(OBJ_DIR)/,$(CC_SRCS:.c=.rel))
 ASMS       := $(OBJS:.rel=.asm)
 LSTS       := $(OBJS:.rel=.lst)
 RSTS       := $(OBJS:.rel=.rst)
@@ -77,7 +77,7 @@ DEPS       := $(OBJS:.rel=.d)
 #----------------------------------------------------------#
 
 CORE_F      = -mstm8
-COMMON_F    = --opt-code-size #--debug
+COMMON_F    = #--debug
 AS_FLAGS    = -l -o -s
 CC_FLAGS    = --std-sdcc11 -MD
 LD_FLAGS    =
@@ -108,24 +108,30 @@ lib : $(LIB)
 
 $(ELF) : $(OBJS)
 	$(info Linking target: $(ELF))
+	$(info foo: $(OBJS))
+	@if not exist "$(subst /,\,$(@D))" md $(subst /,\\,$(@D)) 2>nul
 	$(CC) --out-fmt-elf $(LD_FLAGS) $(OBJS) -o $@
 
 $(LIB) : $(OBJS)
 	$(info Building library: $(LIB))
+	@if not exist "$(subst /,\,$(@D))" md $(subst /,\\,$(@D)) 2>nul
 	$(AR) -r $@ $?
 
 $(OBJS) : $(MAKEFILE_LIST)
 
-%.rel : %.s
+$(OBJ_DIR)/%.rel : %.s
 	$(info Assembling file: $<)
+	@if not exist "$(subst /,\,$(@D))" md $(subst /,\\,$(@D)) 2>nul
 	$(AS) $(AS_FLAGS) $@ $<
 
-%.rel : %.c
+$(OBJ_DIR)/%.rel : %.c
 	$(info Compiling file: $<)
+	@if not exist "$(subst /,\,$(@D))" md $(subst /,\\,$(@D)) 2>nul
 	$(CC) -c $(CC_FLAGS) $< -o $@
 
 $(HEX) : $(OBJS)
 	$(info Creating HEX image: $(HEX))
+	@if not exist "$(subst /,\,$(@D))" md $(subst /,\\,$(@D)) 2>nul
 	$(CC) $(LD_FLAGS) $(OBJS) -o $@
 
 GENERATED = $(BIN) $(ELF) $(HEX) $(LIB) $(LSS) $(MAP) $(CDB) $(LKF) $(LSTS) $(OBJS) $(ASMS) $(DEPS) $(LSTS) $(RSTS) $(SYMS) $(ADBS)

@@ -27,7 +27,6 @@ void assert_failed(uint8_t* file, uint32_t line);
 #define assert_param(expr) ((void)0)
 #endif /* USE_FULL_ASSERT */
 
-#include <stm8s_clk.h>
 #include <stm8s_gpio.h>
 //#include <stm8s_tim1.h>
 

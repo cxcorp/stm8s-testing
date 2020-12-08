@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.flm": "lua",
+        "chrono": "c"
+    }
+}

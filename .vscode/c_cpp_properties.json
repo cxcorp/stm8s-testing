@@ -10,7 +10,9 @@
                 "UNICODE",
                 "_UNICODE",
                 "STM8S103",
-                "__SDCC"
+                "__SDCC",
+                "__critical=",
+                "__interrupt(x)="
             ],
             "windowsSdkVersion": "10.0.18362.0",
             "compilerPath": "E:/Programs/Microsoft Visual Studio/2019/Community/VC/Tools/MSVC/14.23.28105/bin/Hostx64/x64/cl.exe",

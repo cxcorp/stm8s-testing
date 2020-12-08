@@ -26,7 +26,7 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-#include <stm8s_gpio.h>
+#include <stm8/stm8s_gpio.h>
 
 /** @addtogroup STM8S_StdPeriph_Driver
   * @{
