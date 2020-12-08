@@ -6,6 +6,7 @@
 #**********************************************************#
 
 SDCC       := 
+NODE       := node
 STVP       := "C:\Program Files (x86)\STMicroelectronics\st_toolset\stvp\STVP_CmdLine.exe" -BoardName=ST-LINK -Port=USB -ProgMode=SWIM -Device=STM8S103F3 -verif -no_loop -no_log
 
 #----------------------------------------------------------#
@@ -103,6 +104,8 @@ LD_FLAGS   += $(CORE_F) $(COMMON_F) $(LIBS_F) $(LIB_DIRS_F)
 #----------------------------------------------------------#
 
 all : $(ELF)
+	$(info Verifying .hex fits within memory)
+	$(NODE) check-hex.js $(HEX) 8000 2000
 
 lib : $(LIB)
 
