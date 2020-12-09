@@ -22,6 +22,8 @@
 
 static void initialize_clock();
 static void initialize_ms_timer();
+static void led_init();
+static void reed_init() __critical;
 
 void TIM4_UPDATE_IRQ() __interrupt(23)
 {
@@ -40,19 +42,6 @@ void EXTI_REED_PORT_IRQ() __interrupt(REED_PORT_IRQ)
 	reed_changed = 1;
 }
 
-// __critical since we modify interrupts
-static void reed_init() __critical
-{
-	GPIO_Init(REED_SENSE_PORT, REED_SENSE_PIN, GPIO_MODE_IN_FL_IT);
-	// Set Port D interrupts to both rising and falling edge
-	EXTI->CR1 |= REED_PORT_EXTI_MASK;
-}
-
-static void led_init()
-{
-	GPIO_Init(LED_PORT, LED_PIN, GPIO_MODE_OUT_PP_HIGH_SLOW);
-}
-
 uint16_t reflex_threshold = 400;
 
 #define UART_RECV_BUFFER_SIZE 32
@@ -64,8 +53,10 @@ volatile uint8_t uart_recv_consumer_count = 0;
 char uart_cmd_buffer[UART_RECV_BUFFER_SIZE];
 uint8_t uart_cmd_buffer_ptr = 0;
 
-void UART1_DATA_FULL_IRQ() __interrupt(18) {
-	if (uart_recv_producer_count - uart_recv_consumer_count == UART_RECV_BUFFER_SIZE) {
+void UART1_DATA_FULL_IRQ() __interrupt(18)
+{
+	if (uart_recv_producer_count - uart_recv_consumer_count == UART_RECV_BUFFER_SIZE)
+	{
 		// sry buffer full
 		return;
 	}
@@ -81,8 +72,8 @@ void main()
 	Serial_begin();
 
 	__asm__("sim");
-    UART1->CR2 |= UART1_CR2_RIEN;
-    __asm__("rim");
+	UART1->CR2 |= UART1_CR2_RIEN;
+	__asm__("rim");
 
 	reflex_init();
 	reed_init();
@@ -109,14 +100,16 @@ void main()
 			reed_changed = 0;
 		}
 
-		if (uart_recv_producer_count - uart_recv_consumer_count != 0) {
+		if (uart_recv_producer_count - uart_recv_consumer_count != 0)
+		{
 			// we have data
 			char data = uart_recv_buffer[uart_recv_consumer_count % UART_RECV_BUFFER_SIZE];
 			++uart_recv_consumer_count;
 
 			uart_cmd_buffer[uart_cmd_buffer_ptr++] = data;
-			if (uart_cmd_buffer_ptr >= UART_CMD_BUFFER_SIZE || data == '\n') {
-				uart_cmd_buffer[UART_CMD_BUFFER_SIZE-1] = '\n';
+			if (uart_cmd_buffer_ptr >= UART_CMD_BUFFER_SIZE || data == '\n')
+			{
+				uart_cmd_buffer[UART_CMD_BUFFER_SIZE - 1] = '\n';
 				// recv'd line or buffer is full->treat as full line recvd
 
 				// deal with commands
@@ -159,4 +152,17 @@ static void initialize_ms_timer()
 	TIM4->SR1 &= ~TIM4_SR1_UIF;
 	// counter enable
 	TIM4->CR1 |= TIM4_CR1_CEN;
+}
+
+// __critical since we modify interrupts
+static void reed_init() __critical
+{
+	GPIO_Init(REED_SENSE_PORT, REED_SENSE_PIN, GPIO_MODE_IN_FL_IT);
+	// Set Port D interrupts to both rising and falling edge
+	EXTI->CR1 |= REED_PORT_EXTI_MASK;
+}
+
+static void led_init()
+{
+	GPIO_Init(LED_PORT, LED_PIN, GPIO_MODE_OUT_PP_HIGH_SLOW);
 }
