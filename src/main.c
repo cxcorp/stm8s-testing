@@ -4,6 +4,7 @@
 #define SEI __asm__("rim");
 
 #include <stm8/stm8s.h>
+#include <string.h>
 #include "serial.h"
 #include "printf.h"
 #include "millis.h"
@@ -119,10 +120,12 @@ void main()
 				// recv'd line or buffer is full->treat as full line recvd
 
 				// deal with commands
-				char *p = uart_cmd_buffer;
-				if (p[0] == 'T' && p[1] == '?' && p[2] == '\n') {
+				if (memcmp("T?\n", uart_cmd_buffer, 3) == 0)
+				{
 					printf("T=%d\n", reflex_threshold);
-				} else {
+				}
+				else
+				{
 					Serial_println("COMMANDS:");
 					Serial_println("  ?        - Print this help");
 					Serial_println("  T=value  - Set reflex sensor threshold value 0-1024");
