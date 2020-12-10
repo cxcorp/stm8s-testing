@@ -103,7 +103,7 @@ LD_FLAGS   += $(CORE_F) $(COMMON_F) $(LIBS_F) $(LIB_DIRS_F)
 
 #----------------------------------------------------------#
 
-all : $(ELF)
+all : $(ELF) $(HEX)
 	$(info Verifying .hex fits within memory)
 	$(NODE) check-hex.js $(HEX) 8000 2000
 
