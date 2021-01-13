@@ -20,12 +20,15 @@
 #define REED_PORT_EXTI_MASK EXTI_CR1_PCIS
 #define REED_PORT_IRQ 5
 
-#define LED_PORT GPIOB
-#define LED_PIN GPIO_PIN_5
+#define INDICATOR_LED_PORT GPIOB
+#define INDICATOR_LED_PIN GPIO_PIN_5
+#define MOSFET_PORT GPIOC
+#define MOSFET_PIN GPIO_PIN_6
 
 static void initialize_clock();
 static void initialize_ms_timer();
 static void led_init();
+static void mosfet_init();
 static void reed_init() __critical;
 
 static void uartcmd_update();
@@ -50,7 +53,10 @@ void EXTI_REED_PORT_IRQ() __interrupt(REED_PORT_IRQ)
 	reed_changed = 1;
 }
 
+// sync with persistent_config if change
 uint16_t reflex_threshold;
+
+uint16_t reflex_current = 0;
 
 uint8_t reflex_value_printing_enabled = 0;
 
@@ -75,6 +81,9 @@ void UART1_DATA_FULL_IRQ() __interrupt(18)
 	++uart_recv_producer_count;
 }
 
+#define REFLEX_POLL_DELAY 50
+#define REFLEX_PRINT_DELAY 1000
+
 void main()
 {
 	initialize_clock();
@@ -90,23 +99,24 @@ void main()
 	reflex_init();
 	reed_init();
 	led_init();
+	mosfet_init();
 	Serial_print("\n");
 	Serial_println("Hello");
 
-	uint16_t lastDo = 0;
+	uint16_t lastReflexPoll = 0;
+	uint16_t lastReflexPrint = 0;
 	while (1)
 	{
 		uint16_t now = millis();
-		if (now - lastDo >= 1000)
+		if (now - lastReflexPoll >= REFLEX_POLL_DELAY)
 		{
-			lastDo = now;
-
-			uint16_t val = reflex_poll();
-
-			if (reflex_value_printing_enabled)
-			{
-				printf("Reflex = %u\n", val);
-			}
+			lastReflexPoll = now;
+			reflex_current = reflex_poll();
+		}
+		if (now - lastReflexPrint >= REFLEX_PRINT_DELAY && reflex_value_printing_enabled)
+		{
+			lastReflexPrint = now;
+			printf("Reflex = %u\n", reflex_current);
 		}
 
 		if (reed_changed)
@@ -114,6 +124,17 @@ void main()
 			reed_is_closed = !!GPIO_ReadInputPin(REED_SENSE_PORT, REED_SENSE_PIN);
 			printf("reed_is_closed: %x\n", reed_is_closed);
 			reed_changed = 0;
+		}
+
+		if (reed_is_closed && reflex_current >= reflex_threshold)
+		{
+			GPIO_WriteHigh(INDICATOR_LED_PORT, INDICATOR_LED_PIN);
+			GPIO_WriteHigh(MOSFET_PORT, MOSFET_PIN);
+		}
+		else
+		{
+			GPIO_WriteLow(INDICATOR_LED_PORT, INDICATOR_LED_PIN);
+			GPIO_WriteLow(MOSFET_PORT, MOSFET_PIN);
 		}
 
 		uartcmd_update();
@@ -156,7 +177,12 @@ static void reed_init() __critical
 
 static void led_init()
 {
-	GPIO_Init(LED_PORT, LED_PIN, GPIO_MODE_OUT_PP_HIGH_SLOW);
+	GPIO_Init(INDICATOR_LED_PORT, INDICATOR_LED_PIN, GPIO_MODE_OUT_PP_HIGH_SLOW);
+}
+
+static void mosfet_init()
+{
+	GPIO_Init(MOSFET_PORT, MOSFET_PIN, GPIO_MODE_OUT_PP_HIGH_SLOW);
 }
 
 static void uartcmd_update()
@@ -216,7 +242,8 @@ static void uartcmd_execute()
 		return;
 	}
 
-	if (memcmp("RX\n", uart_cmd_buffer, 3) == 0) {
+	if (memcmp("RX\n", uart_cmd_buffer, 3) == 0)
+	{
 		reflex_value_printing_enabled = !reflex_value_printing_enabled;
 		printf("RX=%u\n", reflex_value_printing_enabled);
 		return;
