@@ -1,6 +1,11 @@
 {
     "files.associations": {
         "*.flm": "lua",
-        "chrono": "c"
+        "chrono": "c",
+        "functional": "c",
+        "system_error": "c",
+        "type_traits": "c",
+        "xlocmon": "c",
+        "xtr1common": "c"
     }
 }

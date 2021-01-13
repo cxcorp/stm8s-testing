@@ -4,6 +4,7 @@
 #include <stm8/stm8s.h>
 
 void Serial_begin();
+void Serial_write(const uint8_t value);
 void Serial_print(const char *str);
 void Serial_println(const char *str);
 char Serial_readchar();

@@ -5,10 +5,13 @@
 
 #include <stm8/stm8s.h>
 #include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 #include "serial.h"
 #include "printf.h"
 #include "millis.h"
 #include "reflex.h"
+#include "persistent_config.h"
 
 // if changing, update EXTI interrupt sensitivity
 // port in reed_init() and interrupt# in EXTI3_IRQ
@@ -25,6 +28,10 @@ static void initialize_ms_timer();
 static void led_init();
 static void reed_init() __critical;
 
+static void uartcmd_update();
+static void uartcmd_execute();
+static void uartcmd_print_help();
+
 void TIM4_UPDATE_IRQ() __interrupt(23)
 {
 	// clear update interrupt flag
@@ -35,6 +42,7 @@ void TIM4_UPDATE_IRQ() __interrupt(23)
 }
 
 volatile uint8_t reed_changed = 0;
+uint8_t reed_is_closed;
 
 void EXTI_REED_PORT_IRQ() __interrupt(REED_PORT_IRQ)
 {
@@ -42,7 +50,9 @@ void EXTI_REED_PORT_IRQ() __interrupt(REED_PORT_IRQ)
 	reed_changed = 1;
 }
 
-uint16_t reflex_threshold = 400;
+uint16_t reflex_threshold;
+
+uint8_t reflex_value_printing_enabled = 0;
 
 #define UART_RECV_BUFFER_SIZE 32
 volatile char uart_recv_buffer[UART_RECV_BUFFER_SIZE];
@@ -75,6 +85,8 @@ void main()
 	UART1->CR2 |= UART1_CR2_RIEN;
 	__asm__("rim");
 
+	reflex_threshold = config_read_reflex_threshold();
+
 	reflex_init();
 	reed_init();
 	led_init();
@@ -90,43 +102,21 @@ void main()
 			lastDo = now;
 
 			uint16_t val = reflex_poll();
-			printf("%u\n", val);
+
+			if (reflex_value_printing_enabled)
+			{
+				printf("Reflex = %u\n", val);
+			}
 		}
 
 		if (reed_changed)
 		{
-			uint8_t value = !!GPIO_ReadInputPin(REED_SENSE_PORT, REED_SENSE_PIN);
-			printf("reed changed: %x\n", value);
+			reed_is_closed = !!GPIO_ReadInputPin(REED_SENSE_PORT, REED_SENSE_PIN);
+			printf("reed_is_closed: %x\n", reed_is_closed);
 			reed_changed = 0;
 		}
 
-		if (uart_recv_producer_count - uart_recv_consumer_count != 0)
-		{
-			// we have data
-			char data = uart_recv_buffer[uart_recv_consumer_count % UART_RECV_BUFFER_SIZE];
-			++uart_recv_consumer_count;
-
-			uart_cmd_buffer[uart_cmd_buffer_ptr++] = data;
-			if (uart_cmd_buffer_ptr >= UART_CMD_BUFFER_SIZE || data == '\n')
-			{
-				uart_cmd_buffer[UART_CMD_BUFFER_SIZE - 1] = '\n';
-				// recv'd line or buffer is full->treat as full line recvd
-
-				// deal with commands
-				if (memcmp("T?\n", uart_cmd_buffer, 3) == 0)
-				{
-					printf("T=%d\n", reflex_threshold);
-				}
-				else
-				{
-					Serial_println("COMMANDS:");
-					Serial_println("  ?        - Print this help");
-					Serial_println("  T=value  - Set reflex sensor threshold value 0-1024");
-					Serial_println("  T?       - Read reflex sensor threshold value");
-				}
-				uart_cmd_buffer_ptr = 0;
-			}
-		}
+		uartcmd_update();
 	}
 }
 
@@ -160,9 +150,87 @@ static void reed_init() __critical
 	GPIO_Init(REED_SENSE_PORT, REED_SENSE_PIN, GPIO_MODE_IN_FL_IT);
 	// Set Port D interrupts to both rising and falling edge
 	EXTI->CR1 |= REED_PORT_EXTI_MASK;
+
+	reed_is_closed = !!GPIO_ReadInputPin(REED_SENSE_PORT, REED_SENSE_PIN);
 }
 
 static void led_init()
 {
 	GPIO_Init(LED_PORT, LED_PIN, GPIO_MODE_OUT_PP_HIGH_SLOW);
+}
+
+static void uartcmd_update()
+{
+	if (uart_recv_producer_count - uart_recv_consumer_count == 0)
+	{
+		return;
+	}
+
+	// we have data
+	char data = uart_recv_buffer[uart_recv_consumer_count % UART_RECV_BUFFER_SIZE];
+	++uart_recv_consumer_count;
+
+	uart_cmd_buffer[uart_cmd_buffer_ptr++] = data;
+
+	if (uart_cmd_buffer_ptr >= UART_CMD_BUFFER_SIZE || data == '\n')
+	{
+		if (uart_cmd_buffer_ptr >= UART_CMD_BUFFER_SIZE)
+		{
+			// buffer is full -> treat as a line
+			uart_cmd_buffer[UART_CMD_BUFFER_SIZE - 1] = '\n';
+		}
+
+		uartcmd_execute();
+		uart_cmd_buffer_ptr = 0;
+	}
+}
+
+static void uartcmd_execute()
+{
+	// deal with commands
+	if (memcmp("RXT?\n", uart_cmd_buffer, 5) == 0)
+	{
+		printf("RXT=%d\n", reflex_threshold);
+		return;
+	}
+
+	if (memcmp("RXT=", uart_cmd_buffer, 4) == 0)
+	{
+		const uint8_t cmdLen = 4;
+		uint8_t numbers[5] = {0};
+
+		for (uint8_t ptr = 0; ptr < 4 && uart_cmd_buffer[ptr + cmdLen] != '\n'; ptr++)
+		{
+			if (!isdigit(uart_cmd_buffer[ptr + cmdLen]))
+			{
+				// oops not a number!
+				uartcmd_print_help();
+				return;
+			}
+			numbers[ptr] = uart_cmd_buffer[ptr + cmdLen];
+		}
+		reflex_threshold = (uint16_t)atoi(numbers);
+		config_write_reflex_threshold(reflex_threshold);
+
+		printf("T=%d\n", reflex_threshold);
+		return;
+	}
+
+	if (memcmp("RX\n", uart_cmd_buffer, 3) == 0) {
+		reflex_value_printing_enabled = !reflex_value_printing_enabled;
+		printf("RX=%u\n", reflex_value_printing_enabled);
+		return;
+	}
+
+	// no match
+	uartcmd_print_help();
+}
+
+static void uartcmd_print_help()
+{
+	Serial_println("COMMANDS:");
+	Serial_println("  ?          - Print this help");
+	Serial_println("  RX         - Toggle reflex sensor value printing");
+	Serial_println("  RXT=value  - Set reflex sensor threshold value 0-1024");
+	Serial_println("  RXT?       - Read reflex sensor threshold value");
 }

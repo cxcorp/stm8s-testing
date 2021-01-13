@@ -23,19 +23,20 @@ void Serial_begin()
 
 void Serial_write(const uint8_t value)
 {
-    // wait until previous data register contents
+    // write
+    UART1->DR = value;
+
+    // wait until data register contents
     // have been latched to the shift register
     while ((UART1->SR & UART1_SR_TXE) == 0)
         ;
-    // write
-    UART1->DR = value;
 }
 
 void _putchar(char character)
 {
+    UART1->DR = character;
     while ((UART1->SR & UART1_SR_TXE) == 0)
         ;
-    UART1->DR = character;
 }
 
 void Serial_print(const char *str)

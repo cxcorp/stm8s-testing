@@ -28,6 +28,7 @@ void assert_failed(uint8_t* file, uint32_t line);
 #endif /* USE_FULL_ASSERT */
 
 #include <stm8s_gpio.h>
+#include <stm8s_flash.h>
 //#include <stm8s_tim1.h>
 
 #endif /* __MY_STM8S_CONF_H */

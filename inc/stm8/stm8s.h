@@ -2816,6 +2816,8 @@ Comments :    The different parameters of commands are
 #define BYTE_2(n)                 ((uint8_t)(BYTE_0((n) >> (uint8_t)16))) /*!< Returns the third byte of the 32-bit value */
 #define BYTE_3(n)                 ((uint8_t)(BYTE_0((n) >> (uint8_t)24))) /*!< Returns the high byte of the 32-bit value */
 
+#define UNUSED(x)                 ((void)(x))
+
 /*============================== Assert Macros ====================================*/
 #define IS_STATE_VALUE_OK(SensitivityValue) \
   (((SensitivityValue) == ENABLE) || \
