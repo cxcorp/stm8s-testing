@@ -143,11 +143,11 @@ clean :
 	$(info Removing all generated output files)
 	for %%f in ($(addprefix ",$(addsuffix ",$(subst /,\,$(GENERATED))))) do (if exist %%f del /F %%f)
 
-flash : all $(HEX)
+flash : all
 	$(info Programing device...)
 	$(STVP) -FileProg=$(HEX)
 
-debug : all $(HEX)
+debug : all
 	$(info Debugging device...)
 	$(DBG) $(PROJECT) $(SRC_DIRS_F)
 #	$(SIM) $(HEX)
